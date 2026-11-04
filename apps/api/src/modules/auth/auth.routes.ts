@@ -1,26 +1,11 @@
-import { Router, type CookieOptions, type Response } from 'express';
+import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { loginSchema, registerSchema } from '@tasknest/shared';
-import { config, isProd } from '../../config.js';
-import { REFRESH_TOKEN_TTL_DAYS } from '../../lib/tokens.js';
+import { config } from '../../config.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { validateBody } from '../../middleware/validate.js';
 import * as auth from './auth.service.js';
-
-export const REFRESH_COOKIE = 'tn_refresh';
-
-const cookieOptions: CookieOptions = {
-  httpOnly: true,
-  secure: isProd,
-  sameSite: 'lax',
-  path: '/api/v1/auth',
-  domain: config.COOKIE_DOMAIN,
-};
-
-function sendSession(res: Response, session: auth.Session, status = 200) {
-  res.cookie(REFRESH_COOKIE, session.refreshToken, { ...cookieOptions, maxAge: REFRESH_TOKEN_TTL_DAYS * 864e5 });
-  res.status(status).json({ accessToken: session.accessToken, user: session.user });
-}
+import { REFRESH_COOKIE, cookieOptions, sendSession } from './session.js';
 
 const loginLimiter = rateLimit({
   windowMs: 60_000,

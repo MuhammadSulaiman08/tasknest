@@ -262,3 +262,42 @@ export function parseTaskRef(ref: string): { key: string; number: number } | nul
   const m = /^([A-Za-z][A-Za-z0-9]{1,9})-(\d{1,9})$/.exec(ref.trim());
   return m ? { key: m[1].toUpperCase(), number: Number(m[2]) } : null;
 }
+
+// ---------- Mentions ----------
+/** Mentions are stored in comment bodies as @[Full Name](user:<uuid>) and rendered as "@Full Name". */
+export const MENTION_PATTERN = /@\[([^\]\n]{1,120})\]\(user:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/g;
+
+export const mentionToken = (user: UserRef) => `@[${user.fullName.replace(/[\]\n]/g, '')}](user:${user.id})`;
+
+export function extractMentionIds(body: string): string[] {
+  return [...new Set([...body.matchAll(MENTION_PATTERN)].map((m) => m[2]))];
+}
+
+/** Plain-text version of a comment, with mention tokens turned into "@Name". */
+export const stripMentions = (body: string) => body.replace(MENTION_PATTERN, (_m, name) => `@${name}`);
+
+// ---------- Notifications ----------
+export type NotificationType = 'assigned' | 'mentioned' | 'commented' | 'due_soon';
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  actor: UserRef | null;
+  task: { ref: string; title: string } | null;
+  excerpt: string | null; // comment text for mentions and comments
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  data: NotificationItem[];
+  unreadCount: number;
+}
+
+// ---------- Real-time events (server -> browser) ----------
+export interface RealtimeEvents {
+  'task.changed': { projectKey: string; ref: string };
+  'comment.changed': { ref: string };
+  'project.changed': { key: string };
+  'notification.created': { id: string };
+}

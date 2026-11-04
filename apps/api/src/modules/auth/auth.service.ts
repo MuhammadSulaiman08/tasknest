@@ -24,7 +24,7 @@ export const toPublicUser = (u: {
   timezone: string;
 }): PublicUser => ({ id: u.id, email: u.email, fullName: u.full_name, avatarUrl: u.avatar_url, timezone: u.timezone });
 
-async function issueSession(user: PublicUser, familyId: string = crypto.randomUUID()): Promise<Session> {
+export async function issueSession(user: PublicUser, familyId: string = crypto.randomUUID()): Promise<Session> {
   const refreshToken = randomToken();
   await repo.insertRefreshToken(db, {
     userId: user.id,

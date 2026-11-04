@@ -13,7 +13,7 @@ export function InviteForm({ slug }: { slug: string }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('member');
   const [error, setError] = useState('');
-  const [link, setLink] = useState<{ email: string; url: string } | null>(null);
+  const [link, setLink] = useState<{ email: string; url: string; emailSent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -23,7 +23,7 @@ export function InviteForm({ slug }: { slug: string }) {
     if (!parsed.success) return setError(parsed.error.issues[0].message);
     try {
       const inv = await invite.mutateAsync({ email: parsed.data, role });
-      setLink({ email: inv.email, url: inv.inviteUrl! });
+      setLink({ email: inv.email, url: inv.inviteUrl!, emailSent: !!(inv as { emailSent?: boolean }).emailSent });
       setCopied(false);
       setEmail('');
     } catch (err) {
@@ -47,7 +47,7 @@ export function InviteForm({ slug }: { slug: string }) {
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       {link && (
         <div className="mt-3 rounded-md border border-border bg-primary-subtle p-3">
-          <p className="text-[13px]">Invite created for <strong>{link.email}</strong>. Share this link with them:</p>
+          <p className="text-[13px]">{link.emailSent ? <>Invite emailed to <strong>{link.email}</strong>. You can also share this link:</> : <>Invite created for <strong>{link.email}</strong>. Share this link with them:</>}</p>
           <div className="mt-2 flex gap-2">
             <Input readOnly value={link.url} aria-label="Invite link" className="font-mono text-xs" onFocus={(e) => e.target.select()} />
             <Button type="button" variant="secondary" onClick={() => navigator.clipboard.writeText(link.url).then(() => setCopied(true))}>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { AuthCard } from '@/components/auth/AuthCard';
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { useRedirectIfSignedIn } from '@/components/auth/useRedirectIfSignedIn';
 import { Button, Field, Input } from '@/components/ui';
 import { ApiRequestError } from '@/lib/api';
@@ -53,6 +54,7 @@ function SignupForm() {
         </>
       }
     >
+      <GoogleButton next={next} />
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <Field id="fullName" label="Full name" error={errors.fullName}>
           <Input id="fullName" autoComplete="name" value={values.fullName} onChange={set('fullName')} invalid={!!errors.fullName} aria-describedby={errors.fullName ? 'fullName-error' : undefined} />

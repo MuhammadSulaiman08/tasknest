@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { CreateProjectDialog } from '@/components/CreateProjectDialog';
+import { NotificationBell } from '@/components/NotificationBell';
+import { useRealtime } from '@/lib/realtime';
 import { TaskDrawerHost } from '@/components/task/TaskDrawer';
 import { useProjects } from '@/lib/tasks';
 import { Logo } from '@/components/ui';
@@ -71,6 +73,7 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
   const [mobileOpen, setMobileOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const projects = useProjects(workspace.slug);
+  const live = useRealtime(workspace.slug);
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const base = `/w/${workspace.slug}`;
@@ -178,6 +181,15 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
               <kbd className="pointer-events-none absolute right-2 top-2 hidden rounded border border-border px-1.5 font-mono text-[11px] text-muted sm:block">/</kbd>
             </div>
           </form>
+          <span
+            className={clsx('hidden size-2 shrink-0 rounded-full sm:block', live ? 'bg-success' : 'bg-border')}
+            title={live ? 'Live updates on' : 'Live updates reconnecting'}
+            aria-label={live ? 'Live updates on' : 'Live updates reconnecting'}
+            role="status"
+          />
+          <Suspense>
+            <NotificationBell slug={workspace.slug} />
+          </Suspense>
         </header>
         <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>

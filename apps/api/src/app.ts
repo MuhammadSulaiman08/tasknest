@@ -9,6 +9,8 @@ import { pool } from './db/index.js';
 import { logger } from './lib/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { googleRouter } from './modules/auth/google.js';
+import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 import { commentsRouter } from './modules/comments/comments.routes.js';
 import { projectsRouter } from './modules/projects/projects.routes.js';
 import { tasksRouter } from './modules/tasks/tasks.routes.js';
@@ -34,9 +36,10 @@ export function createApp() {
 
   const api = Router();
   api.use(authRouter);
+  api.use(googleRouter);
   api.use(workspacesRouter);
   // Everything under /w/:slug runs authenticate + loadWorkspace once, then the module routers
-  api.use('/w/:slug', authenticate, loadWorkspace, workspaceScopedRouter, projectsRouter, tasksRouter, commentsRouter);
+  api.use('/w/:slug', authenticate, loadWorkspace, workspaceScopedRouter, projectsRouter, tasksRouter, commentsRouter, notificationsRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

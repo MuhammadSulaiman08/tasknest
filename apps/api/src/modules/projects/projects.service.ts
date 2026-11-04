@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import { db } from '../../db/index.js';
 import { AppError } from '../../lib/AppError.js';
 import { assertMember, toDateOnly } from '../../lib/members.js';
+import { emitToWorkspace } from '../../realtime/bus.js';
 
 function baseQuery(workspaceId: string) {
   return db
@@ -69,6 +70,7 @@ export async function create(workspaceId: string, userId: string, input: CreateP
     })
     .returning('id')
     .executeTakeFirstOrThrow(); // 23505 on projects_workspace_key_uq -> PROJECT_KEY_TAKEN
+  emitToWorkspace(workspaceId, 'project.changed', { key: input.key });
   return getByKey(workspaceId, input.key);
 }
 
@@ -99,6 +101,7 @@ export async function update(
     })
     .where('id', '=', project.id)
     .execute();
+  emitToWorkspace(workspaceId, 'project.changed', { key: project.key });
   return getByKey(workspaceId, key);
 }
 

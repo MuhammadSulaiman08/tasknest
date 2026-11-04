@@ -28,7 +28,7 @@ tasksRouter.get('/tasks/:ref', async (req, res) => {
 });
 
 tasksRouter.patch('/tasks/:ref', requireRole('member'), validateBody(updateTaskSchema), async (req, res) => {
-  res.json({ data: await svc.update(req.workspace!.id, String(req.params.ref), req.body) });
+  res.json({ data: await svc.update(req.workspace!.id, String(req.params.ref), req.userId!, req.body) });
 });
 
 tasksRouter.patch('/tasks/:ref/move', requireRole('member'), validateBody(moveTaskSchema), async (req, res) => {

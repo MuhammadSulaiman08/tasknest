@@ -5,6 +5,8 @@ import { db } from '../../db/index.js';
 import type { DB } from '../../db/types.js';
 import { AppError } from '../../lib/AppError.js';
 import { assertMember } from '../../lib/members.js';
+import { emitToWorkspace } from '../../realtime/bus.js';
+import { notify } from '../notifications/notifications.service.js';
 import { resolveProject } from '../projects/projects.service.js';
 import { STEP, needsRebalance, positionBetween } from './position.js';
 
@@ -219,14 +221,18 @@ export async function create(
       parent_task_id: input.parentTaskId ?? null,
       position,
     })
-    .returning('number')
+    .returning(['id', 'number'])
     .executeTakeFirstOrThrow();
-  return detail(workspaceId, `${project.key}-${row.number}`);
+  if (input.assigneeId) await notify([{ userId: input.assigneeId, workspaceId, type: 'assigned', taskId: row.id, actorId: userId }]);
+  const ref = `${project.key}-${row.number}`;
+  emitToWorkspace(workspaceId, 'task.changed', { projectKey: project.key, ref });
+  return detail(workspaceId, ref);
 }
 
 export async function update(
   workspaceId: string,
   ref: string,
+  actorId: string,
   input: {
     title?: string;
     description?: string | null;
@@ -239,6 +245,7 @@ export async function update(
 ) {
   const task = await resolveTask(workspaceId, ref);
   await assertMember(workspaceId, input.assigneeId, 'assigneeId');
+  const before = await db.selectFrom('tasks').select(['assignee_id']).where('id', '=', task.id).executeTakeFirstOrThrow();
   const statusChanged = input.status !== undefined && input.status !== task.status;
   await db
     .updateTable('tasks')
@@ -247,7 +254,7 @@ export async function update(
       ...(input.description !== undefined && { description: input.description || null }),
       ...(input.priority !== undefined && { priority: input.priority }),
       ...(input.assigneeId !== undefined && { assignee_id: input.assigneeId }),
-      ...(input.dueDate !== undefined && { due_date: input.dueDate }),
+      ...(input.dueDate !== undefined && { due_date: input.dueDate, due_soon_notified_at: null }),
       ...(input.estimatePoints !== undefined && { estimate_points: input.estimatePoints }),
       ...(statusChanged && {
         status: input.status,
@@ -257,6 +264,10 @@ export async function update(
     })
     .where('id', '=', task.id)
     .execute();
+  if (input.assigneeId && input.assigneeId !== before.assignee_id) {
+    await notify([{ userId: input.assigneeId, workspaceId, type: 'assigned', taskId: task.id, actorId }]);
+  }
+  emitToWorkspace(workspaceId, 'task.changed', { projectKey: task.key, ref: ref.toUpperCase() });
   return detail(workspaceId, ref);
 }
 
@@ -301,6 +312,7 @@ export async function move(workspaceId: string, ref: string, input: MoveTaskInpu
 
     await trx.updateTable('tasks').set({ status: input.status, position }).where('id', '=', task.id).execute();
   });
+  emitToWorkspace(workspaceId, 'task.changed', { projectKey: task.key, ref: ref.toUpperCase() });
   return detail(workspaceId, ref);
 }
 
@@ -326,4 +338,5 @@ export async function remove(workspaceId: string, ref: string) {
     .where((eb) => eb.or([eb('id', '=', task.id), eb('parent_task_id', '=', task.id)]))
     .where('deleted_at', 'is', null)
     .execute();
+  emitToWorkspace(workspaceId, 'task.changed', { projectKey: task.key, ref: ref.toUpperCase() });
 }

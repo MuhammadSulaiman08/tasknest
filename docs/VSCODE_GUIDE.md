@@ -4,7 +4,7 @@ _Set up, run, test, debug and deploy TaskNest from Visual Studio Code, step by s
 
 ## 1. What you will end up with
 
-By the end of this guide TaskNest runs on your computer: the website at http://localhost:3000, the API at http://localhost:4000 and PostgreSQL in Docker. You will be able to run the 45 automated tests, set breakpoints in VS Code, browse the database, and deploy a live demo link for your resume.
+By the end of this guide TaskNest runs on your computer: the website at http://localhost:3000, the API at http://localhost:4000 and PostgreSQL in Docker. You will be able to run the 57 automated tests, set breakpoints in VS Code, browse the database, and deploy a live demo link for your resume.
 
 ![Figure 1. The project board you should see after setup (demo account)](screenshots/11-board.png)
 
@@ -81,8 +81,9 @@ tasknest/
 │   │   ├── http/         api.http: ready-made requests for REST Client
 │   │   ├── src/
 │   │   │   ├── middleware/   auth, workspace + role checks, validation, errors
-│   │   │   └── modules/      auth, workspaces, projects, tasks, comments
-│   │   └── test/         45 integration tests (Vitest + Supertest)
+│   │   │   ├── modules/      auth, workspaces, projects, tasks, comments, notifications
+│   │   │   └── realtime/     Socket.IO live updates
+│   │   └── test/         57 integration tests (Vitest + Supertest)
 │   └── web/              Next.js website (port 3000)
 │       └── src/
 │           ├── app/          pages: /login, /w/[slug]/p/[key] (board), ...
@@ -142,6 +143,13 @@ Open **http://localhost:3000** and log in with the demo account. Other demo user
 | hira@tasknest.app | password123 | Member | Create and drag tasks |
 | sana@tasknest.app | password123 | Guest | Read-only board, can still comment |
 
+#### See live updates and notifications
+
+1. Open a second browser window in private/incognito mode and log in as `bilal@tasknest.app`.
+2. Open the Website board in both windows. The small green dot next to the search box means live updates are on.
+3. As Ayesha, drag a card or add a task: it appears in Bilal's window within a second.
+4. As Ayesha, open a task and type `@Bi` in a comment, pick Bilal Ahmed and send. Bilal's bell shows a red badge; clicking the notification opens the task.
+
 Stop the servers with **Ctrl+C** in each terminal. The database keeps running in Docker; stop it with `pnpm db:down` if you want. To restore the demo data at any time: `pnpm db:seed`.
 
 ## 7. Run the tests
@@ -149,14 +157,14 @@ Stop the servers with **Ctrl+C** in each terminal. The database keeps running in
 ### From the terminal
 
 ```
-pnpm test         # 45 API tests against the tasknest_test database
+pnpm test         # 57 API tests against the tasknest_test database
 pnpm typecheck    # TypeScript checks for every package
 ```
 
 ### From the Testing panel
 
 1. Click the **flask icon** in the left Activity Bar (installed by the Vitest extension).
-2. Expand the tree: `auth.test.ts`, `workspaces.test.ts`, `tasks.test.ts`, `position.test.ts`.
+2. Expand the tree: `auth`, `workspaces`, `tasks`, `notifications`, `google`, `realtime` and `position` test files.
 3. Click ▶ next to any test or file. Green tick = pass. Click a failed test to jump to the failing line.
 
 > **Note:** The test database is wiped and rebuilt at the start of every test run, so tests never touch your demo data.
@@ -259,7 +267,7 @@ Generate a random secret in the terminal with: `node -e "console.log(require('cr
 2. Settings: Root Directory: leave empty. Runtime: Node. Instance type: **Free**.
 3. Build Command: `corepack enable && pnpm install --frozen-lockfile`
 4. Start Command: `pnpm --filter @tasknest/api start`
-5. Environment variables: `DATABASE_URL`, `JWT_SECRET`, `WEB_ORIGIN` (same values as `.env.production`), `NODE_ENV=production`, `NODE_VERSION=22`.
+5. Environment variables: `DATABASE_URL`, `JWT_SECRET`, `WEB_ORIGIN` (same values as `.env.production`), `NODE_ENV=production`, `NODE_VERSION=22`. Optional: the Google and Resend variables from section 11.4.
 6. Under Advanced, set Health Check Path to `/health`. Click **Create Web Service** and wait for "Live".
 7. Open `https://<your-service>.onrender.com/health`. You should see `{"status":"ok"}`.
 
@@ -267,12 +275,30 @@ Generate a random secret in the terminal with: `node -e "console.log(require('cr
 
 1. Sign up at vercel.com with GitHub → **Add New → Project** → import `tasknest`.
 2. Root Directory: click Edit and choose `apps/web`. Framework: Next.js (detected).
-3. Environment variable: `API_URL` = your Render URL, e.g. `https://tasknest-api.onrender.com` (no slash at the end).
+3. Environment variables: `API_URL` and `NEXT_PUBLIC_API_URL`, both set to your Render URL, e.g. `https://tasknest-api.onrender.com` (no slash at the end). The second one is used by the browser for live updates.
 4. Click **Deploy**. When it finishes, copy the site URL.
 5. If the Vercel URL differs from the `WEB_ORIGIN` you guessed, update `WEB_ORIGIN` on Render and redeploy the API.
 6. Open the site and log in with `demo@tasknest.app` / `password123`.
 
 > **Note:** Render's free tier sleeps after 15 minutes without traffic, so the first request can take about 30–50 seconds. Mention "first load may take a moment" in your README, or open the link yourself a minute before an interview.
+
+### 11.4 Optional: Google sign-in and invite emails
+
+Both features are built in and switch on when their keys are set. Without them the app works normally: the Google button is hidden and invite links are shown to copy (and printed in the API log).
+
+#### Google sign-in
+
+1. Go to console.cloud.google.com → create a project → **APIs & Services → OAuth consent screen** → External → fill in app name and your email → add yourself as a test user.
+2. **Credentials → Create credentials → OAuth client ID** → Web application.
+3. Authorised redirect URIs: add `http://localhost:3000/api/v1/auth/google/callback` and, for the live site, `https://<your-vercel-url>/api/v1/auth/google/callback`.
+4. Copy the Client ID and Client secret into `apps/api/.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (and into Render for production). Restart the API.
+5. The login and sign-up pages now show **Continue with Google**. An existing account with the same email is linked automatically.
+
+#### Invite emails with Resend
+
+1. Sign up at resend.com and create an API key.
+2. Set `RESEND_API_KEY` in `apps/api/.env` (and on Render). Without your own domain, Resend only delivers to your own email address, which is enough for a demo.
+3. Invites now say "Invite emailed to …" and still show the link to copy.
 
 ## 12. Put it on your resume
 
@@ -280,13 +306,14 @@ Suggested project entry (edit the numbers once you have your own deployment):
 
 ```
 TaskNest | Multi-tenant project management SaaS       github.com/<you>/tasknest | <live link>
-Next.js · React · TypeScript · Node.js/Express · PostgreSQL · Tailwind · Vitest
+Next.js · React · TypeScript · Node.js/Express · PostgreSQL · Socket.IO · Tailwind · Vitest
 - Built a Jira-style SaaS with workspaces, role-based access (owner/admin/member/guest),
-  Kanban boards with drag and drop, task details, subtasks and threaded comments.
+  Kanban boards with drag and drop, subtasks, threaded comments with @mentions,
+  in-app notifications and real-time updates over WebSockets (Socket.IO).
 - Designed a PostgreSQL schema with partial and full-text indexes, trigger-based task
   numbering and fractional ordering so a card move writes a single row.
-- Implemented JWT auth with rotating refresh tokens and reuse detection; enforced tenant
-  isolation on every route and covered it with 45 integration tests in CI.
+- Implemented JWT auth with rotating refresh tokens and reuse detection plus Google OAuth;
+  enforced tenant isolation on every route and covered it with 57 integration tests in CI.
 - Planned the work in Agile sprints and documented it with a PRD, TRD, app flow,
   UI/UX brief and backend specification.
 ```
@@ -310,6 +337,9 @@ Next.js · React · TypeScript · Node.js/Express · PostgreSQL · Tailwind · V
 | Logged out after every refresh | The API is not running or `API_URL` in `apps/web/.env.local` is wrong (should be `http://localhost:4000`). |
 | Red squiggles but the app runs | Ctrl+Shift+P → **TypeScript: Select TypeScript Version** → **Use Workspace Version**; then **Developer: Reload Window**. |
 | Changes in `packages/shared` not picked up by the API | Restart `pnpm dev:api` (the watcher only watches the API folder). |
+| Grey dot instead of green (no live updates) | The browser cannot reach the API socket. Check `NEXT_PUBLIC_API_URL` in `apps/web/.env.local` (local: `http://localhost:4000`) and restart `pnpm dev:web`. Everything else still works; pages refresh every minute. |
+| Google button does not appear | Set both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `apps/api/.env` and restart the API. |
+| Google says redirect_uri_mismatch | Add the exact callback URL from section 11.4 to the OAuth client in Google Cloud, including http/https and port. |
 | Render deploy fails on install | Make sure `NODE_VERSION=22` is set and the build command starts with `corepack enable`. |
 | Live site loads but login fails | Check `API_URL` on Vercel (no trailing slash) and `WEB_ORIGIN` on Render (exact Vercel URL, https). |
 
@@ -322,7 +352,7 @@ Next.js · React · TypeScript · Node.js/Express · PostgreSQL · Tailwind · V
 | `pnpm first-run` | Create .env files, start DB, migrate, seed (first time) |
 | `pnpm dev` | Start API + website |
 | `pnpm dev:api` / `pnpm dev:web` | Start one of them |
-| `pnpm test` | Run the API test suite |
+| `pnpm test` | Run the 57 API tests |
 | `pnpm typecheck` | TypeScript check for all packages |
 | `pnpm db:up` / `pnpm db:down` | Start / stop PostgreSQL in Docker |
 | `pnpm db:migrate` | Apply new SQL migrations |

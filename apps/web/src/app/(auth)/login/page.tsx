@@ -3,17 +3,33 @@
 import { loginSchema } from '@tasknest/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import { AuthCard } from '@/components/auth/AuthCard';
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { useRedirectIfSignedIn } from '@/components/auth/useRedirectIfSignedIn';
 import { Button, Field, Input } from '@/components/ui';
+import { refreshSession } from '@/lib/api';
 import { homePath, useAuth } from '@/lib/auth';
 import { errorMessage, fieldErrors } from '@/lib/forms';
 
 function LoginForm() {
-  const { login } = useAuth();
+  const { login, reloadMe } = useAuth();
   const router = useRouter();
   const { next } = useRedirectIfSignedIn();
+  const params = useSearchParams();
+  // Returning from Google: the refresh cookie is set, so load the session and continue
+  useEffect(() => {
+    const error = params.get('error');
+    if (error) setFormError(error);
+    if (params.get('sso') !== '1') return;
+    refreshSession().then(async (s) => {
+      const me = s ? await reloadMe() : null;
+      if (me) router.replace(next ?? homePath(me));
+      else setFormError('Google sign-in did not complete, please try again');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [values, setValues] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
@@ -48,6 +64,7 @@ function LoginForm() {
         </>
       }
     >
+      <GoogleButton next={next} />
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <Field id="email" label="Email" error={errors.email}>
           <Input id="email" type="email" autoComplete="email" value={values.email} onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))} invalid={!!errors.email} />

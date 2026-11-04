@@ -7,7 +7,7 @@ export const app = createApp();
 export const api = () => request(app);
 
 export async function resetDb() {
-  await sql`TRUNCATE users, workspaces, workspace_members, projects, tasks, comments, refresh_tokens, invitations CASCADE`.execute(db);
+  await sql`TRUNCATE users, workspaces, workspace_members, projects, tasks, comments, refresh_tokens, invitations, notifications CASCADE`.execute(db);
 }
 
 let n = 0;

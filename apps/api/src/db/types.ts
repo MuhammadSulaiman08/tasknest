@@ -45,6 +45,18 @@ export interface Invitations {
   workspace_id: string;
 }
 
+export interface Notifications {
+  actor_id: string | null;
+  comment_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  read_at: Timestamp | null;
+  task_id: string | null;
+  type: string;
+  user_id: string;
+  workspace_id: string;
+}
+
 export interface Projects {
   archived_at: Timestamp | null;
   created_at: Generated<Timestamp>;
@@ -80,6 +92,7 @@ export interface Tasks {
   deleted_at: Timestamp | null;
   description: string | null;
   due_date: Timestamp | null;
+  due_soon_notified_at: Timestamp | null;
   estimate_points: number | null;
   id: Generated<string>;
   number: number;
@@ -101,6 +114,7 @@ export interface Users {
   deleted_at: Timestamp | null;
   email: string;
   full_name: string;
+  google_id: string | null;
   id: Generated<string>;
   is_active: Generated<boolean>;
   last_login_at: Timestamp | null;
@@ -133,6 +147,7 @@ export interface Workspaces {
 export interface DB {
   comments: Comments;
   invitations: Invitations;
+  notifications: Notifications;
   projects: Projects;
   refresh_tokens: RefreshTokens;
   tasks: Tasks;

@@ -1,6 +1,6 @@
 'use client';
 
-import { priorityLabels, statusLabels, type CommentItem, type TaskDetail, type TaskPriority, type TaskStatus } from '@tasknest/shared';
+import { priorityLabels, statusLabels, type CommentItem, type TaskDetail, type TaskPriority, type TaskStatus, type UserRef } from '@tasknest/shared';
 import clsx from 'clsx';
 import { Check, Link2, Loader2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ import { errorMessage } from '@/lib/forms';
 import { useCommentMutations, useComments, useCreateTask, useDeleteTask, useTask, useUpdateTask } from '@/lib/tasks';
 import { canAdmin, useMembers, type Workspace } from '@/lib/workspaces';
 import { MiniAvatar, PRIORITY_ORDER, PriorityIcon, STATUS_ORDER, StatusIcon, formatDue } from './bits';
+import { CommentBody, MentionInput, fromStored, toStored, type MentionInputHandle } from './MentionInput';
 
 const timeAgo = (iso: string) => {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -358,6 +359,8 @@ function Comments({ slug, taskRef, workspace }: { slug: string; taskRef: string;
   const { me } = useAuth();
   const { data: comments, isLoading } = useComments(slug, taskRef);
   const { add, edit, remove } = useCommentMutations(slug, taskRef);
+  const members = useMembers(slug);
+  const people: UserRef[] = (members.data ?? []).filter((m) => m.id !== me?.user.id).map((m) => ({ id: m.id, fullName: m.fullName }));
   const [replyTo, setReplyTo] = useState<CommentItem | null>(null);
   const top = (comments ?? []).filter((c) => !c.parentCommentId);
   const replies = (id: string) => (comments ?? []).filter((c) => c.parentCommentId === id);
@@ -371,6 +374,8 @@ function Comments({ slug, taskRef, workspace }: { slug: string; taskRef: string;
       canDelete={c.author?.id === me?.user.id || canAdmin(workspace.role)}
       onReply={() => setReplyTo(c)}
       onEdit={(body) => edit.mutateAsync({ id: c.id, body })}
+      people={people}
+      meId={me?.user.id}
       onDelete={() => confirm('Delete this comment?') && remove.mutate(c.id)}
     />
   );
@@ -391,6 +396,7 @@ function Comments({ slug, taskRef, workspace }: { slug: string; taskRef: string;
       <Composer
         key={replyTo?.id ?? 'new'}
         replyTo={replyTo}
+        people={people}
         onCancelReply={() => setReplyTo(null)}
         onSubmit={async (body) => {
           await add.mutateAsync({ body, parentCommentId: replyTo?.id ?? null });
@@ -401,9 +407,11 @@ function Comments({ slug, taskRef, workspace }: { slug: string; taskRef: string;
   );
 }
 
-function CommentView({ c, isReply, mine, canDelete, onReply, onEdit, onDelete }: { c: CommentItem; isReply: boolean; mine: boolean; canDelete: boolean; onReply: () => void; onEdit: (b: string) => Promise<unknown>; onDelete: () => void }) {
+function CommentView({ c, isReply, mine, canDelete, onReply, onEdit, onDelete, people, meId }: { c: CommentItem; isReply: boolean; mine: boolean; canDelete: boolean; onReply: () => void; onEdit: (b: string) => Promise<unknown>; onDelete: () => void; people: UserRef[]; meId?: string }) {
   const [editing, setEditing] = useState(false);
-  const [body, setBody] = useState(c.body);
+  const initial = fromStored(c.body);
+  const [body, setBody] = useState(initial.text);
+  const [mentions, setMentions] = useState<UserRef[]>(initial.mentions);
   const name = c.author?.fullName ?? 'Former member';
   return (
     <div className="flex gap-2.5">
@@ -417,19 +425,19 @@ function CommentView({ c, isReply, mine, canDelete, onReply, onEdit, onDelete }:
             onSubmit={async (e) => {
               e.preventDefault();
               if (!body.trim()) return;
-              await onEdit(body.trim());
+              await onEdit(toStored(body.trim(), mentions));
               setEditing(false);
             }}
             className="mt-1"
           >
-            <textarea aria-label="Edit comment" value={body} onChange={(e) => setBody(e.target.value)} rows={2} className="w-full rounded-md border border-primary bg-surface px-2 py-1.5 text-sm" />
+            <MentionInput label="Edit comment" value={body} onChange={setBody} mentions={mentions} onMentionsChange={setMentions} people={people} rows={2} />
             <div className="mt-1 flex gap-2">
               <Button size="sm" type="submit">Save</Button>
-              <Button size="sm" variant="ghost" type="button" onClick={() => { setEditing(false); setBody(c.body); }}>Cancel</Button>
+              <Button size="sm" variant="ghost" type="button" onClick={() => { setEditing(false); setBody(initial.text); setMentions(initial.mentions); }}>Cancel</Button>
             </div>
           </form>
         ) : (
-          <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-5">{c.body}</p>
+          <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-5"><CommentBody body={c.body} meId={meId} /></p>
         )}
         {!editing && (
           <div className="mt-1 flex gap-3 text-xs text-muted">
@@ -443,11 +451,12 @@ function CommentView({ c, isReply, mine, canDelete, onReply, onEdit, onDelete }:
   );
 }
 
-function Composer({ replyTo, onCancelReply, onSubmit }: { replyTo: CommentItem | null; onCancelReply: () => void; onSubmit: (body: string) => Promise<void> }) {
+function Composer({ replyTo, people, onCancelReply, onSubmit }: { replyTo: CommentItem | null; people: UserRef[]; onCancelReply: () => void; onSubmit: (body: string) => Promise<void> }) {
   const [body, setBody] = useState('');
+  const [mentions, setMentions] = useState<UserRef[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<MentionInputHandle>(null);
   useEffect(() => {
     if (replyTo) ref.current?.focus();
   }, [replyTo]);
@@ -456,8 +465,9 @@ function Composer({ replyTo, onCancelReply, onSubmit }: { replyTo: CommentItem |
     setBusy(true);
     setError('');
     try {
-      await onSubmit(body.trim());
+      await onSubmit(toStored(body.trim(), mentions));
       setBody('');
+      setMentions([]);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -472,24 +482,20 @@ function Composer({ replyTo, onCancelReply, onSubmit }: { replyTo: CommentItem |
           <button onClick={onCancelReply} className="underline hover:text-text">Cancel</button>
         </p>
       )}
-      <textarea
+      <MentionInput
         ref={ref}
-        aria-label={replyTo ? 'Write a reply' : 'Write a comment'}
+        label={replyTo ? 'Write a reply' : 'Write a comment'}
         value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        rows={3}
-        placeholder={replyTo ? 'Write a reply…' : 'Write a comment…'}
-        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+        onChange={setBody}
+        mentions={mentions}
+        onMentionsChange={setMentions}
+        people={people}
+        onSubmit={submit}
+        placeholder={replyTo ? 'Write a reply…' : 'Write a comment… Type @ to mention someone'}
       />
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-xs text-muted">Ctrl + Enter to send</span>
+        <span className="text-xs text-muted">@ to mention · Ctrl + Enter to send</span>
         <Button size="sm" onClick={submit} loading={busy} disabled={!body.trim()}>{replyTo ? 'Reply' : 'Comment'}</Button>
       </div>
     </div>

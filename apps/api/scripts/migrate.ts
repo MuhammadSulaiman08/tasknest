@@ -45,7 +45,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set');
   migrate(url).catch((e) => {
-    console.error(e.message);
+    // Connection failures to "localhost" arrive as an AggregateError with an empty message, so print the details
+    const details = e instanceof AggregateError ? e.errors.map((x: Error & { code?: string }) => x.code ?? x.message).join(', ') : '';
+    console.error(`Migration failed: ${e.message || e.code || ''} ${details}`.trim());
+    if (/ECONNREFUSED/.test(String(e.code ?? details))) {
+      console.error('Could not reach PostgreSQL. Check DATABASE_URL in apps/api/.env (for Neon it must be the postgresql://...neon.tech/... string).');
+    }
     process.exit(1);
   });
 }

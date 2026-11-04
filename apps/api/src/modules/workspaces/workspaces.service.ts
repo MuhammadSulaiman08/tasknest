@@ -1,6 +1,7 @@
 import type { WorkspaceRole } from '@tasknest/shared';
 import { config } from '../../config.js';
 import { AppError } from '../../lib/AppError.js';
+import { inviteEmail, sendEmail } from '../../lib/mailer.js';
 import { hashToken, randomToken } from '../../lib/tokens.js';
 import { findUserById } from '../auth/auth.repo.js';
 import * as repo from './workspaces.repo.js';
@@ -48,8 +49,11 @@ export async function invite(ws: Ws, invitedBy: string, email: string, role: Exc
     invitedBy,
     expiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 864e5),
   });
-  // Email delivery arrives with the mailer (v1.2); until then the admin copies this link
-  return { ...invitation, inviteUrl: `${config.WEB_ORIGIN}/invite/${token}` };
+  const inviteUrl = `${config.WEB_ORIGIN}/invite/${token}`;
+  const inviter = await findUserById(invitedBy);
+  // Sent through Resend when configured; the link is always returned so the admin can also copy it
+  const emailSent = await sendEmail(inviteEmail({ to: email, inviter: inviter?.full_name ?? 'A teammate', workspace: ws.name, role, url: inviteUrl }));
+  return { ...invitation, inviteUrl, emailSent };
 }
 
 export const listInvitations = (ws: Ws) => repo.listPendingInvitations(ws.id);
