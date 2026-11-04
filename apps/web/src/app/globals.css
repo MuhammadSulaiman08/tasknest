@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+
+/* Design tokens from the UI/UX Brief, section 4 */
+:root {
+  --primary: #2f5db3;
+  --primary-subtle: #eef3fc;
+  --text: #1f2937;
+  --text-muted: #5b6475;
+  --border: #d5dae3;
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --success: #1e8e5a;
+  --warning: #c08a1e;
+  --danger: #c2413b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #6a93e8;
+    --primary-subtle: #1c2a45;
+    --text: #e6e9ef;
+    --text-muted: #a3abba;
+    --border: #323a48;
+    --canvas: #12161d;
+    --surface: #1a1f28;
+    --success: #4cc08a;
+    --warning: #e2b04f;
+    --danger: #ef7a74;
+  }
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+html,
+body {
+  background: var(--canvas);
+  color: var(--text);
+}
+body {
+  font-size: 14px;
+  line-height: 20px;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
