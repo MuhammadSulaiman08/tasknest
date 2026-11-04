@@ -3,13 +3,28 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "first-run": "node scripts/first-run.mjs",
     "dev": "pnpm -r --parallel dev",
+    "dev:api": "pnpm --filter @tasknest/api dev",
+    "dev:web": "pnpm --filter @tasknest/web dev",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @tasknest/api migrate",
+    "db:seed": "pnpm --filter @tasknest/api db:seed",
+    "test": "pnpm --filter @tasknest/api test",
+    "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "format": "prettier --write ."
   },
   "packageManager": "pnpm@10.28.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
   }
 }

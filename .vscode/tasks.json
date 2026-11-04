@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup: first run (install, database, migrate, seed)",
+      "type": "shell",
+      "command": "pnpm first-run",
+      "problemMatcher": []
+    },
+    { "label": "Database: start (Docker)", "type": "shell", "command": "pnpm db:up", "problemMatcher": [] },
+    { "label": "Database: stop (Docker)", "type": "shell", "command": "pnpm db:down", "problemMatcher": [] },
+    { "label": "Database: run migrations", "type": "shell", "command": "pnpm db:migrate", "problemMatcher": [] },
+    { "label": "Database: reset demo data", "type": "shell", "command": "pnpm db:seed", "problemMatcher": [] },
+    {
+      "label": "Dev: API",
+      "type": "shell",
+      "command": "pnpm dev:api",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "Dev: Web",
+      "type": "shell",
+      "command": "pnpm dev:web",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "Dev: API + Web",
+      "dependsOn": ["Dev: API", "Dev: Web"],
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Test: API",
+      "type": "shell",
+      "command": "pnpm test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    { "label": "Check: types", "type": "shell", "command": "pnpm typecheck", "problemMatcher": ["$tsc"] }
+  ]
+}

@@ -9,7 +9,12 @@ import { pool } from './db/index.js';
 import { logger } from './lib/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { authRouter } from './modules/auth/auth.routes.js';
-import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
+import { commentsRouter } from './modules/comments/comments.routes.js';
+import { projectsRouter } from './modules/projects/projects.routes.js';
+import { tasksRouter } from './modules/tasks/tasks.routes.js';
+import { workspaceScopedRouter, workspacesRouter } from './modules/workspaces/workspaces.routes.js';
+import { authenticate } from './middleware/authenticate.js';
+import { loadWorkspace } from './middleware/workspace.js';
 
 export function createApp() {
   const app = express();
@@ -30,6 +35,8 @@ export function createApp() {
   const api = Router();
   api.use(authRouter);
   api.use(workspacesRouter);
+  // Everything under /w/:slug runs authenticate + loadWorkspace once, then the module routers
+  api.use('/w/:slug', authenticate, loadWorkspace, workspaceScopedRouter, projectsRouter, tasksRouter, commentsRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

@@ -1,0 +1,58 @@
+### TaskNest API requests (VS Code "REST Client" extension: click "Send Request" above each block)
+@base = http://localhost:4000/api/v1
+@slug = demo-team
+
+### 1. Log in as the demo user (copy accessToken from the response into @token below)
+# @name login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "demo@tasknest.app", "password": "password123" }
+
+###
+@token = {{login.response.body.accessToken}}
+
+### 2. Who am I?
+GET {{base}}/me
+Authorization: Bearer {{token}}
+
+### 3. Projects in the workspace
+GET {{base}}/w/{{slug}}/projects
+Authorization: Bearer {{token}}
+
+### 4. Board for project WEB
+GET {{base}}/w/{{slug}}/projects/WEB/tasks
+Authorization: Bearer {{token}}
+
+### 5. Create a task
+POST {{base}}/w/{{slug}}/projects/WEB/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "Try the REST Client", "priority": "high", "dueDate": "2026-12-01" }
+
+### 6. One task with subtasks
+GET {{base}}/w/{{slug}}/tasks/WEB-6
+Authorization: Bearer {{token}}
+
+### 7. Move a task to In progress (top of the column)
+PATCH {{base}}/w/{{slug}}/tasks/WEB-7/move
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "in_progress" }
+
+### 8. Search
+GET {{base}}/w/{{slug}}/search?q=schema
+Authorization: Bearer {{token}}
+
+### 9. My tasks
+GET {{base}}/w/{{slug}}/my-tasks
+Authorization: Bearer {{token}}
+
+### 10. Comment on a task
+POST {{base}}/w/{{slug}}/tasks/WEB-5/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "body": "Sent from VS Code" }

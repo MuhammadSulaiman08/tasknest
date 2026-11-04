@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+apps/api/src/db/types.ts
+apps/api/migrations
+.next
+docs

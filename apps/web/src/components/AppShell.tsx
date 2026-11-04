@@ -1,13 +1,16 @@
 'use client';
 
 import clsx from 'clsx';
-import { Check, ChevronsUpDown, Home, ListTodo, LogOut, Menu, Plus, Settings, X } from 'lucide-react';
+import { Check, ChevronsUpDown, FolderKanban, Home, ListTodo, LogOut, Menu, Plus, Search, Settings, X } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { CreateProjectDialog } from '@/components/CreateProjectDialog';
+import { TaskDrawerHost } from '@/components/task/TaskDrawer';
+import { useProjects } from '@/lib/tasks';
 import { Logo } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import type { Workspace } from '@/lib/workspaces';
+import { canAdmin, type Workspace } from '@/lib/workspaces';
 
 export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
   const initials = name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
@@ -66,10 +69,26 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
   const { me, logout } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const projects = useProjects(workspace.slug);
+  const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
   const base = `/w/${workspace.slug}`;
+  // "/" focuses search (UI/UX Brief, keyboard shortcuts)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && !(e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const nav = [
     { href: base, label: 'Home', icon: Home, exact: true },
-    { href: `${base}/my-tasks`, label: 'My tasks', icon: ListTodo, soon: true },
+    { href: `${base}/my-tasks`, label: 'My tasks', icon: ListTodo },
+    { href: `${base}/projects`, label: 'Projects', icon: FolderKanban, exact: true },
     { href: `${base}/settings/members`, label: 'Settings', icon: Settings },
   ];
   useEffect(() => setMobileOpen(false), [pathname]);
@@ -78,23 +97,38 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
     <nav aria-label="Main" className="flex h-full flex-col gap-1 p-3">
       <WorkspaceSwitcher current={workspace} />
       <div className="mt-3 space-y-0.5">
-        {nav.map(({ href, label, icon: Icon, exact, soon }) => {
+        {nav.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
-          return soon ? (
-            <span key={href} className="flex cursor-default items-center gap-2.5 rounded-md px-2 py-1.5 text-muted" title="Arrives with tasks in week 5">
-              <Icon className="size-[18px]" aria-hidden /> {label}
-              <span className="ml-auto rounded bg-canvas px-1.5 text-[10px] font-medium uppercase">Soon</span>
-            </span>
-          ) : (
+          return (
             <Link key={href} href={href} aria-current={active ? 'page' : undefined} className={clsx('flex items-center gap-2.5 rounded-md px-2 py-1.5', active ? 'bg-primary-subtle font-medium text-primary' : 'hover:bg-primary-subtle')}>
               <Icon className="size-[18px]" aria-hidden /> {label}
             </Link>
           );
         })}
       </div>
-      <p className="mt-6 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted">Projects</p>
-      <p className="px-2 py-1 text-[13px] text-muted">Projects arrive in the next milestone.</p>
-      <div className="mt-auto flex items-center gap-2 border-t border-border px-1 pt-3">
+      <div className="mt-6 flex items-center justify-between px-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Projects</p>
+        {canAdmin(workspace.role) && (
+          <button onClick={() => setCreating(true)} className="rounded p-0.5 text-muted hover:bg-primary-subtle hover:text-text" aria-label="New project" title="New project">
+            <Plus className="size-4" />
+          </button>
+        )}
+      </div>
+      <div className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+        {projects.data?.filter((p) => p.status !== 'archived').map((p) => {
+          const href = `${base}/p/${p.key}`;
+          const active = pathname === href;
+          return (
+            <Link key={p.id} href={href} aria-current={active ? 'page' : undefined} className={clsx('flex items-center gap-2 rounded-md px-2 py-1.5', active ? 'bg-primary-subtle font-medium text-primary' : 'hover:bg-primary-subtle')}>
+              <span className="w-9 shrink-0 font-mono text-[11px] text-muted">{p.key}</span>
+              <span className="truncate">{p.name}</span>
+              {p.openTasks > 0 && <span className="ml-auto text-xs text-muted">{p.openTasks}</span>}
+            </Link>
+          );
+        })}
+        {projects.data && !projects.data.some((p) => p.status !== 'archived') && <p className="px-2 py-1 text-[13px] text-muted">No projects yet.</p>}
+      </div>
+      <div className="mt-3 flex items-center gap-2 border-t border-border px-1 pt-3">
         <Avatar name={me?.user.fullName ?? '?'} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-medium">{me?.user.fullName}</p>
@@ -128,10 +162,29 @@ export function AppShell({ workspace, children }: { workspace: Workspace; childr
         <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur lg:px-6">
           <button onClick={() => setMobileOpen(true)} className="rounded-md p-1.5 hover:bg-primary-subtle lg:hidden" aria-label="Open menu"><Menu className="size-5" /></button>
           <span className="lg:hidden"><Logo /></span>
-          <span className="hidden text-muted lg:inline">{workspace.name}</span>
+          <form
+            role="search"
+            className="ml-auto w-full max-w-xs"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = searchRef.current?.value.trim();
+              if (q) router.push(`${base}/search?q=${encodeURIComponent(q)}`);
+            }}
+          >
+            <label htmlFor="global-search" className="sr-only">Search tasks</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted" aria-hidden />
+              <input id="global-search" ref={searchRef} placeholder="Search tasks" className="h-9 w-full rounded-md border border-border bg-canvas pl-8 pr-8 text-sm" />
+              <kbd className="pointer-events-none absolute right-2 top-2 hidden rounded border border-border px-1.5 font-mono text-[11px] text-muted sm:block">/</kbd>
+            </div>
+          </form>
         </header>
-        <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
+      <Suspense>
+        <TaskDrawerHost workspace={workspace} />
+      </Suspense>
+      {creating && <CreateProjectDialog slug={workspace.slug} onClose={() => setCreating(false)} />}
     </div>
   );
 }

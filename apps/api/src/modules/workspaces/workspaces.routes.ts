@@ -4,7 +4,7 @@ import { createWorkspaceSchema, emailSchema, slugSchema, updateMemberRoleSchema,
 import { AppError } from '../../lib/AppError.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { validateBody } from '../../middleware/validate.js';
-import { loadWorkspace, requireRole } from '../../middleware/workspace.js';
+import { requireRole } from '../../middleware/workspace.js';
 import * as svc from './workspaces.service.js';
 
 const inviteSchema = z.object({ email: emailSchema, role: z.enum(['admin', 'member', 'guest']).default('member') });
@@ -31,9 +31,9 @@ workspacesRouter.post('/invitations/:token/accept', authenticate, async (req, re
   res.json({ data: await svc.acceptInvitation(String(req.params.token), req.userId!) });
 });
 
-// ----- Scoped to /w/:slug -----
-const w = Router({ mergeParams: true });
-workspacesRouter.use('/w/:slug', authenticate, loadWorkspace, w);
+// ----- Scoped to /w/:slug (mounted in app.ts behind authenticate + loadWorkspace) -----
+export const workspaceScopedRouter = Router();
+const w = workspaceScopedRouter;
 
 w.get('/', (req, res) => {
   const { id, name, slug, role } = req.workspace!;
